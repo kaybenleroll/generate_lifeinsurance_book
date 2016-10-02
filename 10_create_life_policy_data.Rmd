@@ -1,0 +1,428 @@
+---
+title: "Life Policy Generation: 10 - Create Life Policy Data"
+author: "Mick Cooney"
+date: "1 October 2016"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: yes
+    theme: cerulean
+    css: assets/styles.css
+  pdf_document: default
+---
+
+<!--
+(Title:) Life Policy Generation: 10 - Create Life Policy Data
+
+Author: Mick Cooney
+
+Date: 2016
+
+Abstract: This worksheet deals with the basics of creating life policy data
+
+Keywords: life insurance, insurance, data generation
+
+-->
+
+```{r knit_opts, include = FALSE}
+knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
+
+library(data.table)
+library(dplyr)
+library(dtplyr)
+
+library(jsonlite)
+library(ggplot2)
+library(lifecontingencies)
+
+options(width = 80)
+
+source("custom_functions.R")
+
+set.seed(42)
+```
+
+# Load Input Data
+
+This worksheet enables the generation of a fake book of policies for a life insurance company in Ireland
+
+## Set up input parameters
+
+```{r}
+# N is the policy count you want to generate
+N <- 250000
+
+# data_startdate is the first date at which we start creating policies
+# data_snapshotdate is the date we take the policy 'snapshot'
+data_startdate    <- as.Date('1990-01-01')
+data_snapshotdate <- as.Date('2015-12-31')
+
+
+# prem_freq is distributed such that almost all are monthly payments
+# though a few are yearly
+prem_freq_prop   <- c("12" = 0.9, "4" = 0.02, "1" = 0.08)
+prem_freq_cutoff <- as.Date('2005-01-01')
+
+# Select which cluster count we are using for our policy generation
+use_cluster_level = 'n6'
+
+
+# Parameters for the gamma distribution used to generate the prem_ape variable
+# Protection policies will later be calculated for protection policies
+premape_shape <- 1.1
+premape_scale <- 500
+
+
+# Set the gender proportion for the book and different smoking levels
+# In order, the labels are S, Q, and N
+male_prop   <- 0.7
+smoker_prop <- list("M" = c(0.30, 0.20, 0.50)
+                   ,"F" = c(0.25, 0.40, 0.35))
+
+# Set proportions for various protection policies
+jointlife_prop       <- 0.3
+lifeonly_prop        <- 0.75
+large_amount_prop    <- 0.05
+
+mortgage_status_prop <- c("TERM" = 0.4, "MORTDECR" = 0.5, "MORTFULL" = 0.1)
+
+# Add 40% to the premium to account for profit margin and expenses
+premium_expense_ratio <- 0.4
+
+
+# Interest rate for discounting time value of money
+interest_rate <- 0.04
+
+# We load some lifetable and morbidity data to price the protection policies
+load("data/lifemorb_tables.rda")
+
+act_tables <- list(m_lifetable       = m_lifetable
+                  ,f_lifetable       = f_lifetable
+                  ,mn_morb_lifetable = mn_morb_lifetable
+                  ,fn_morb_lifetable = fn_morb_lifetable)
+
+output_csv  <- sprintf("dt_policy_%08d.csv", N)
+output_json <- sprintf("lifeins_policybook_%08d.json", N)
+output_rds  <- sprintf("lifeins_policybook_%08d.rds", N)
+
+output_intermediate_rds  <- sprintf("lifeins_policybook.rds", N)
+
+print(paste(output_csv))
+```
+
+## Load Data from Files
+
+Load up the smallarea data that comes with the census GIS data
+
+```{r}
+dt_smallarea <- fread("data/smallarea_gisdb.csv")[, sa_id := geogid]
+t(head(dt_smallarea, 3))
+```
+
+Load up the clustering info for the small areas
+
+```{r}
+dt_clustersmallarea <- melt(fread("data/aai_censusclusterids.csv"), id = 'sa_id')[
+    ,cluster_id := paste0(variable, "_c", value)][
+    ,.(sa_id, cluster_level = variable, cluster_id)]
+
+head(dt_clustersmallarea)
+```
+
+Load the cluster proportions in the policy book
+
+```{r}
+dt_clusterpolicyprop <- fread("data/cluster_policy_proportions.csv")
+head(dt_clusterpolicyprop)
+```
+
+Load the cluster propensities for the four product types
+
+```{r}
+dt_clusterproductmapping <- fread("data/cluster_product_mapping.csv")
+head(dt_clusterproductmapping)
+```
+
+Load product data
+
+```{r}
+dt_productdata <- fread("data/product_input_data.csv")
+head(dt_productdata)
+
+dt_productdurprop <- fread("data/product_duration_data.csv")
+head(dt_productdurprop, 10)
+```
+
+# Create Policy Data
+
+We need to generate a policyid which is just a unique identifier
+
+```{r}
+policyid_N <- 10^floor(log10(N))
+policy_id <- sample((policyid_N*10):(policyid_N*100), N, replace = FALSE)
+
+policy_id <- sprintf("C%09d", policy_id)
+```
+
+First randomly select a cluster for the policy and use this to set a small area
+
+```{r}
+dt_smallarea <- merge(dt_smallarea
+                      ,dt_clustersmallarea[cluster_level %in% use_cluster_level]
+                      ,by = 'sa_id')
+```
+
+```{r}
+dt_policyprop  <- dt_clusterpolicyprop[cluster_level == use_cluster_level]
+cluster_count  <- dt_policyprop[, .N]
+
+cluster_idx <- sample(1:cluster_count, N, prob = dt_policyprop$proportion, replace = TRUE)
+cluster_id  <- dt_policyprop[cluster_idx]$cluster_id
+
+
+dt_clusterprod <- melt(dt_clusterproductmapping
+                       ,id = c("cluster_level", "cluster_id", "cluster_name"))
+```
+
+```{r}
+dt_policy <- rbindlist(lapply(unique(cluster_id), sample_cluster_data, dt_smallarea, dt_clusterprod, cluster_id))
+dt_policy[, policy_id := policy_id]
+```
+
+```{r}
+head(dt_policy)
+```
+
+```{r}
+### For each prod_type we create some data and then bind the data.tables together
+dt_product <- rbindlist(lapply(dt_policy[, sort(unique(prod_type))]
+                              ,sample_product_data
+                              ,dt_productdata
+                              ,premape_shape = premape_shape
+                              ,premape_scale = premape_scale
+                              ))
+```
+
+```{r}
+dt_product[, policy_id := dt_policy[prod_type == .BY$prod_type]$policy_id, by = prod_type]
+dt_policy[,  prod_type := NULL]
+
+dt_policy <- merge(dt_policy, dt_product, by = 'policy_id')
+```
+
+```{r}
+head(dt_policy)
+```
+
+```{r}
+### Create some datetime values
+start_dates <- seq(data_startdate, data_snapshotdate, by = 'day')
+
+invisible(dt_policy[, policy_startdate := sample(start_dates, N, replace = TRUE)])
+
+day_modifier <- sample(1:365, N, replace = TRUE) - 1
+dt_policy[, dob_life1 := policy_startdate - (365 * policy_startage)]
+dt_policy[, dob_life1 := dob_life1 - day_modifier]
+```
+
+```{r}
+### Select the prem_freq for RP policies
+dt_policy[prem_type == "RP", prem_freq := sample(names(prem_freq_prop)
+                                                ,.N
+                                                ,replace = TRUE
+                                                ,prob    = prem_freq_prop)]
+
+dt_policy[prem_type == 'RP' &
+          prem_freq == '4'  &
+          policy_startdate >= prem_freq_cutoff, prem_freq := '12']
+```
+
+```{r}
+### Create gender and gender-related variables
+dt_policy[, gender_life1 := sample(c("M", "F")
+                                  ,N
+                                  ,replace = TRUE
+                                  ,prob = c(male_prop, 1 - male_prop))]
+
+dt_policy[gender_life1 == 'M'
+         ,smoker_life1 := sample(c("S", "Q", "N")
+                                ,.N
+                                ,replace = TRUE
+                                ,prob = smoker_prop[["M"]])]
+
+dt_policy[gender_life1 == 'F'
+         ,smoker_life1 := sample(c("S", "Q", "N")
+                                ,.N
+                                ,replace = TRUE
+                                ,prob = smoker_prop[["F"]])]
+```
+
+Estimate the policy duration
+
+```{r}
+dt_duration <- dt_policy[, {
+    use_dt <- dt_productdurprop[prod_type == .BY$prod_type]
+
+    if(nrow(use_dt) > 0) {
+        policy_duration <- sample(use_dt$duration,.N,replace = TRUE,prob = use_dt$prop)
+    } else {
+        policy_duration <- rep(as.integer(NA), .N)
+    }
+
+    .(policy_id = policy_id, policy_duration = policy_duration)
+}, by = prod_type]
+
+dt_policy <- merge(dt_policy, dt_duration[, .(policy_id, policy_duration)], by = 'policy_id')
+dt_policy[policy_duration == -1, policy_duration := NA]
+
+# Add some sanity checks for policy holder age - No-one should be older than 65,
+# and no policies cover beyond the age of 75
+dt_policy[prod_type == 'protection' & policy_startage > 65, policy_duration := 5]
+dt_policy[prod_type == 'protection' & (policy_startage + policy_duration > 75)
+         ,policy_duration := as.integer(75 - policy_startage)]
+
+# Policies starting before 2002-01-01 do not have a policy_duration of longer than 20 years
+dt_policy[prod_type        == 'protection' &
+          policy_startdate < as.Date('2002-01-01') &
+          policy_duration  > 20
+         ,policy_duration := 20]
+
+
+# If a policy has no duration we set the end date to be when the holder turns 120 years old
+# Otherwise we set the end date to be the date when the policy expires
+dt_policy[is.na(policy_duration)
+         ,policy_enddate := lubridate::`%m+%`(dob_life1, lubridate::years(120))]
+
+# The bizarre syntax for %m+% is because I did not want to load lubridate as it overwrites
+# some data.table stuff. Stupid R namespace management
+dt_policy[!is.na(policy_duration)
+         ,policy_enddate := lubridate::`%m+%`(policy_startdate
+                                             ,lubridate::years(policy_duration))]
+
+ggplot(dt_policy %>% filter(prod_type == 'protection', policy_startage >= 55)) +
+    geom_point(aes(x = policy_startage, y = policy_duration))
+
+
+### Add some extra data for mortgage-linked protection policies and afew other pieces of information
+dt_policy[prod_type == 'protection'
+         ,mortgage_status := sample(names(mortgage_status_prop)
+                                   ,.N
+                                   ,replace = TRUE
+                                   ,prob = mortgage_status_prop)]
+
+dt_policy[prod_type == 'protection', isjointlife := rbinom(.N, 1, jointlife_prop) == 1]
+dt_policy[prod_type == 'protection', islifeonly  := rbinom(.N, 1, lifeonly_prop)  == 1]
+
+t(head(dt_policy,3))
+```
+
+```{r}
+### Add a mortality rating to protection policies
+dt_policy[prod_type == 'protection'
+         ,mort_rating := calculate_mort_rating(.N
+                                              ,dt_clusterpolicyprop[cluster_id == .BY$cluster_id, mort_shape]
+                                              ,dt_clusterpolicyprop[cluster_id == .BY$cluster_id, mort_scale])
+         ,by = cluster_id]
+
+dt_policy[prod_type == 'protection' & smoker_life1 == "S", mort_rating := mort_rating + 100]
+dt_policy[prod_type == 'protection' & smoker_life1 == "Q", mort_rating := mort_rating + 50]
+
+t(head(dt_policy, 3))
+```
+
+Calculate the premium for the protection policies
+
+```{r}
+dt_policy[, policy_startage := as.numeric(floor((policy_startdate - dob_life1) / 365))]
+
+dt_policy[prod_type == 'protection'
+         ,premium_factor := calculate_protection_premium(policy_startage
+                                                        ,policy_duration
+                                                        ,isjointlife
+                                                        ,islifeonly
+                                                        ,acttables     = act_tables
+                                                        ,interest_rate = interest_rate)
+         ,by = policy_id]
+```
+
+```{r}
+dt_policy[prod_type == 'protection'
+         ,sum_assured := 100000 + 50000 * sample(0:8, .N, replace = TRUE)]
+
+dt_policy[prod_type == 'protection'
+         ,sum_assured := ifelse(runif(.N) < large_amount_prop, sum_assured * 10, sum_assured)]
+
+dt_policy[prod_type == 'protection'
+         ,prem_risk := (sum_assured * premium_factor * mort_rating / 100)]
+
+dt_policy[prod_type == 'protection' & mortgage_status == 'MORTDECR'
+         ,prem_risk := prem_risk * 0.7]
+
+t(head(dt_policy,3))
+t(head(dt_policy[prod_type == 'protection'],3))
+```
+
+```{r}
+### Once we have calculated a premium, we need to add a margin for
+### expenses and for profit margin etc.
+### We have set this as an additional 30% to the premium
+
+dt_policy[prod_type == 'protection', prem_ape  := round(prem_risk * (1 + premium_expense_ratio), 2)]
+
+dim(dt_policy[prod_type == 'protection' & is.na(policy_duration)])
+```
+
+
+```{r}
+### Add some geographical information
+dt_policy <- merge(dt_policy, dt_smallarea[, .(sa_id, countyname, edname, nuts3name)]
+                   ,by = 'sa_id',all_x = TRUE)
+
+dt_output <- dt_policy[, .(policy_id,countyname,edname,nuts3name,sa_id,cluster_id,prod_type
+                           ,prem_type,prem_freq,prem_ape,prem_risk,policy_startdate,policy_enddate
+                           ,policy_duration,mort_rating,sum_assured
+                           ,dob_life1,gender_life1,smoker_life1,isjointlife,islifeonly
+                           ,mortgage_status)]
+
+setkey(dt_output, policy_id)
+
+t(head(dt_output,3))
+
+dt_output[, quantile(prem_ape, 0.50, na.rm = TRUE), by = prod_type]
+
+ggplot(dt_output %>% filter(prod_type == 'protection')) +
+    geom_density(aes(x = prem_ape))
+```
+
+
+# Output Data
+
+Write the CSV data out to files
+
+```{r}
+write.csv(dt_output
+         ,file = paste0('output/',output_csv)
+         ,row.names = FALSE
+         ,fileEncoding = 'UTF-8')
+
+print(output_csv)
+```
+
+Convert the data to JSON and output it
+
+```{r}
+write(toJSON(dt_output), file = paste0('output/',output_json))
+
+print(output_json)
+```
+
+Write the Data as an R Data File
+
+```{r}
+saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
+print(output_rds)
+
+saveRDS(dt_output, file = paste0('output/',output_intermediate_rds), compress = 'xz')
+print(output_intermediate_rds)
+```

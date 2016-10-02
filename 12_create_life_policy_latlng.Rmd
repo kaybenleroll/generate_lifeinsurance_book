@@ -1,0 +1,115 @@
+<div style=float:right><img src="assets/img/applied-logo.png" width=100 style="margin: 0px 20px"></img></div>
+
+##### Applied AI Internal Demo Project
+## Life Insurance Policy Book Creation
+
+This worksheet enables the generation of a fake book of policies for a life insurance company in Ireland
+
+
+    
+# 12_create_life_policy_latlng
+
+#### Acquisition, Cleaning, Visualisation    
+    
+    
+    
++ [Setup](#Setup)
+    + [Local Functions](#Local-Functions)
+    + [Load Input Data](#Load-Input-Data)
+
+```{r}
+library(data.table)
+library(pbapply)
+library(RPostgreSQL)
+library(jsonlite)
+```
+
+## Local Functions
+
+```{r}
+retrieve_random_smallarea_points <- function(dbconnect, sa_id) {
+    dt_latlng <- rbindlist(pblapply(sa_id, function(iterid) {
+        sql_query <- paste("SELECT st_x(ipoint) AS lng, st_y(ipoint) AS lat "
+                         , "FROM (SELECT randompoint(geom) AS ipoint "
+                         , "FROM census2011_smallareamaps WHERE geogid = '", iterid, "') AS temp", sep = '');
+
+        data_dt <- dbGetQuery(dbconnect, sql_query);
+
+        return(data_dt);
+    }));
+
+    return(dt_latlng);
+}
+```
+
+## Load Input Data
+
+### Set up input parameters
+
+```{r}
+db.host   <- 'localhost'
+db.dbname <- 'appliedai_geospatial'
+db.user   <- 'geospuser'
+db.pass   <- 'geospuser'
+```
+
+### Load Data from Files
+
+```{r}
+dt_policy <- fread("data/output/dt_policy.csv")
+```
+
+# Generate Random Lat/Lng Co-ordinates
+
+```{r}
+# If you want to randomly create co-ordinates for the geolocation
+# of each policy holder, create a PostgreSQL database connection
+# to the database holding the census data
+
+dbconnect.pgsql <- dbConnect(dbDriver("PostgreSQL")
+                             ,host   = db.host
+                             ,dbname = db.dbname
+                             ,user   = db.user
+                             ,pass   = db.pass)
+```
+
+```{r}
+dt_locations <- retrieve_random_smallarea_points(dbconnect.pgsql, dt_policy$sa_id);
+```
+
+```{r}
+dt_policy <- cbind(dt_policy, dt_locations)
+```
+
+```{r}
+```
+
+```{r}
+```
+
+# Output Data
+
+## Write the CSV data out to files
+
+```{r}
+write.csv(dt_policy
+          ,file = 'data/output/dt_policy_withlatlng.csv'
+          ,row.names = FALSE
+          ,fileEncoding = 'UTF-8');
+```
+
+## Convert the data to JSON and output it
+
+```{r}
+write(toJSON(dt_policy), file = 'data/output/lifeins_policybook.json')
+```
+
+## Write the Data as an R Data File
+
+```{r}
+save(dt_policy, file = 'data/output/lifeins_policybook_withlatlng.rda', compress = 'xz')
+```
+
+---
+**&copy; Applied AI Ltd 2016**  
+<a href='http://www.applied.ai'>applied.ai</a>

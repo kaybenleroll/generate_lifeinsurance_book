@@ -1,0 +1,6 @@
+## R related ...........................
+.RData
+.Rhistory
+
+data/*.csv
+output/*
