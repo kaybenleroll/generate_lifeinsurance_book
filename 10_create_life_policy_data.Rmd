@@ -48,9 +48,9 @@ This worksheet enables the generation of a fake book of policies for a life insu
 
 ## Set up input parameters
 
-```{r}
+```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
-N <- 250000
+N <- 100000
 
 # data_startdate is the first date at which we start creating policies
 # data_snapshotdate is the date we take the policy 'snapshot'
@@ -113,7 +113,7 @@ print(paste(output_csv))
 ## Load Data from Files
 
 
-```{r}
+```{r load_datafiles, echo=TRUE}
 # Load up the smallarea data that comes with the census GIS data
 dt_smallarea <- fread("data/smallarea_gisdb.csv")[, sa_id := geogid]
 
@@ -137,7 +137,7 @@ dt_productdurprop <- fread("data/product_duration_data.csv")
 
 We need to generate a policyid which is just a unique identifier
 
-```{r echo=TRUE}
+```{r generate_policy_ids, echo=TRUE}
 policyid_N <- 10^floor(log10(N))
 policy_id <- sample((policyid_N*10):(policyid_N*100), N, replace = FALSE)
 
@@ -146,7 +146,7 @@ policy_id <- sprintf("C%09d", policy_id)
 
 First randomly select a cluster for the policy and use this to set a small area
 
-```{r}
+```{r create_cluster_data, echo=TRUE}
 dt_smallarea <- merge(dt_smallarea
                       ,dt_clustersmallarea[cluster_level %in% use_cluster_level]
                       ,by = 'sa_id')
@@ -191,7 +191,7 @@ dt_policy[, dob_life1 := policy_startdate - (365 * policy_startage)]
 dt_policy[, dob_life1 := dob_life1 - day_modifier]
 ```
 
-```{r}
+```{r echo=TRUE}
 ### Select the prem_freq for RP policies
 dt_policy[prem_type == "RP", prem_freq := sample(names(prem_freq_prop)
                                                 ,.N
@@ -223,7 +223,7 @@ dt_policy[gender_life1 == 'F'
 
 Estimate the policy duration
 
-```{r}
+```{r echo=TRUE}
 dt_duration <- dt_policy[, {
     use_dt <- dt_productdurprop[prod_type == .BY$prod_type]
 
@@ -293,7 +293,7 @@ t(head(dt_policy, 3))
 
 Calculate the premium for the protection policies
 
-```{r}
+```{r echo=TRUE}
 dt_policy[, policy_startage := as.numeric(floor((policy_startdate - dob_life1) / 365))]
 
 dt_policy[prod_type == 'protection'
@@ -318,7 +318,7 @@ dt_policy[prod_type == 'protection' & mortgage_status == 'MORTDECR'
          ,prem_risk := prem_risk * 0.7]
 ```
 
-```{r}
+```{r echo=TRUE}
 ### Once we have calculated a premium, we need to add a margin for
 ### expenses and for profit margin etc.
 ### We have set this as an additional 30% to the premium
@@ -329,7 +329,7 @@ dim(dt_policy[prod_type == 'protection' & is.na(policy_duration)])
 ```
 
 
-```{r}
+```{r echo=TRUE}
 ### Add some geographical information
 dt_policy <- merge(dt_policy, dt_smallarea[, .(sa_id, countyname, edname, nuts3name)]
                    ,by = 'sa_id',all_x = TRUE)
@@ -353,7 +353,7 @@ ggplot(dt_output %>% filter(prod_type == 'protection')) +
 
 Write the CSV data out to files
 
-```{r}
+```{r output_data, echo=TRUE}
 write.csv(dt_output
          ,file = paste0('output/',output_csv)
          ,row.names = FALSE
@@ -362,7 +362,7 @@ print(output_csv)
 
 
 # Convert the data to JSON and output it
-write(toJSON(dt_output), file = paste0('output/',output_json))
+write(jsonlite::toJSON(dt_output), file = paste0('output/',output_json))
 print(output_json)
 
 saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
