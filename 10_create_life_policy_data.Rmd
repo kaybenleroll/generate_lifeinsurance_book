@@ -28,12 +28,11 @@ Keywords: life insurance, insurance, data generation
 ```{r knit_opts, include = FALSE}
 knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
 
+library(tidyverse)
+
 library(data.table)
-library(dplyr)
 library(dtplyr)
 
-library(jsonlite)
-library(ggplot2)
 library(lifecontingencies)
 
 options(width = 80)
@@ -113,52 +112,32 @@ print(paste(output_csv))
 
 ## Load Data from Files
 
-Load up the smallarea data that comes with the census GIS data
 
 ```{r}
+# Load up the smallarea data that comes with the census GIS data
 dt_smallarea <- fread("data/smallarea_gisdb.csv")[, sa_id := geogid]
-t(head(dt_smallarea, 3))
-```
 
-Load up the clustering info for the small areas
-
-```{r}
+# Load up the clustering info for the small areas
 dt_clustersmallarea <- melt(fread("data/aai_censusclusterids.csv"), id = 'sa_id')[
     ,cluster_id := paste0(variable, "_c", value)][
     ,.(sa_id, cluster_level = variable, cluster_id)]
 
-head(dt_clustersmallarea)
-```
-
-Load the cluster proportions in the policy book
-
-```{r}
+# Load the cluster proportions in the policy book
 dt_clusterpolicyprop <- fread("data/cluster_policy_proportions.csv")
-head(dt_clusterpolicyprop)
-```
 
-Load the cluster propensities for the four product types
-
-```{r}
+# Load the cluster propensities for the four product types
 dt_clusterproductmapping <- fread("data/cluster_product_mapping.csv")
-head(dt_clusterproductmapping)
-```
 
-Load product data
-
-```{r}
-dt_productdata <- fread("data/product_input_data.csv")
-head(dt_productdata)
-
+# Load product data
+dt_productdata    <- fread("data/product_input_data.csv")
 dt_productdurprop <- fread("data/product_duration_data.csv")
-head(dt_productdurprop, 10)
 ```
 
 # Create Policy Data
 
 We need to generate a policyid which is just a unique identifier
 
-```{r}
+```{r echo=TRUE}
 policyid_N <- 10^floor(log10(N))
 policy_id <- sample((policyid_N*10):(policyid_N*100), N, replace = FALSE)
 
@@ -171,9 +150,7 @@ First randomly select a cluster for the policy and use this to set a small area
 dt_smallarea <- merge(dt_smallarea
                       ,dt_clustersmallarea[cluster_level %in% use_cluster_level]
                       ,by = 'sa_id')
-```
 
-```{r}
 dt_policyprop  <- dt_clusterpolicyprop[cluster_level == use_cluster_level]
 cluster_count  <- dt_policyprop[, .N]
 
@@ -183,18 +160,12 @@ cluster_id  <- dt_policyprop[cluster_idx]$cluster_id
 
 dt_clusterprod <- melt(dt_clusterproductmapping
                        ,id = c("cluster_level", "cluster_id", "cluster_name"))
-```
 
-```{r}
 dt_policy <- rbindlist(lapply(unique(cluster_id), sample_cluster_data, dt_smallarea, dt_clusterprod, cluster_id))
 dt_policy[, policy_id := policy_id]
 ```
 
-```{r}
-head(dt_policy)
-```
-
-```{r}
+```{r echo=TRUE}
 ### For each prod_type we create some data and then bind the data.tables together
 dt_product <- rbindlist(lapply(dt_policy[, sort(unique(prod_type))]
                               ,sample_product_data
@@ -202,24 +173,18 @@ dt_product <- rbindlist(lapply(dt_policy[, sort(unique(prod_type))]
                               ,premape_shape = premape_shape
                               ,premape_scale = premape_scale
                               ))
-```
 
-```{r}
 dt_product[, policy_id := dt_policy[prod_type == .BY$prod_type]$policy_id, by = prod_type]
 dt_policy[,  prod_type := NULL]
 
 dt_policy <- merge(dt_policy, dt_product, by = 'policy_id')
 ```
 
-```{r}
-head(dt_policy)
-```
-
-```{r}
+```{r echo=TRUE}
 ### Create some datetime values
 start_dates <- seq(data_startdate, data_snapshotdate, by = 'day')
 
-invisible(dt_policy[, policy_startdate := sample(start_dates, N, replace = TRUE)])
+dt_policy[, policy_startdate := sample(start_dates, N, replace = TRUE)]
 
 day_modifier <- sample(1:365, N, replace = TRUE) - 1
 dt_policy[, dob_life1 := policy_startdate - (365 * policy_startage)]
@@ -236,9 +201,7 @@ dt_policy[prem_type == "RP", prem_freq := sample(names(prem_freq_prop)
 dt_policy[prem_type == 'RP' &
           prem_freq == '4'  &
           policy_startdate >= prem_freq_cutoff, prem_freq := '12']
-```
 
-```{r}
 ### Create gender and gender-related variables
 dt_policy[, gender_life1 := sample(c("M", "F")
                                   ,N
@@ -314,10 +277,7 @@ dt_policy[prod_type == 'protection'
 dt_policy[prod_type == 'protection', isjointlife := rbinom(.N, 1, jointlife_prop) == 1]
 dt_policy[prod_type == 'protection', islifeonly  := rbinom(.N, 1, lifeonly_prop)  == 1]
 
-t(head(dt_policy,3))
-```
 
-```{r}
 ### Add a mortality rating to protection policies
 dt_policy[prod_type == 'protection'
          ,mort_rating := calculate_mort_rating(.N
@@ -344,9 +304,7 @@ dt_policy[prod_type == 'protection'
                                                         ,acttables     = act_tables
                                                         ,interest_rate = interest_rate)
          ,by = policy_id]
-```
 
-```{r}
 dt_policy[prod_type == 'protection'
          ,sum_assured := 100000 + 50000 * sample(0:8, .N, replace = TRUE)]
 
@@ -358,9 +316,6 @@ dt_policy[prod_type == 'protection'
 
 dt_policy[prod_type == 'protection' & mortgage_status == 'MORTDECR'
          ,prem_risk := prem_risk * 0.7]
-
-t(head(dt_policy,3))
-t(head(dt_policy[prod_type == 'protection'],3))
 ```
 
 ```{r}
@@ -387,8 +342,6 @@ dt_output <- dt_policy[, .(policy_id,countyname,edname,nuts3name,sa_id,cluster_i
 
 setkey(dt_output, policy_id)
 
-t(head(dt_output,3))
-
 dt_output[, quantile(prem_ape, 0.50, na.rm = TRUE), by = prod_type]
 
 ggplot(dt_output %>% filter(prod_type == 'protection')) +
@@ -405,21 +358,13 @@ write.csv(dt_output
          ,file = paste0('output/',output_csv)
          ,row.names = FALSE
          ,fileEncoding = 'UTF-8')
-
 print(output_csv)
-```
 
-Convert the data to JSON and output it
 
-```{r}
+# Convert the data to JSON and output it
 write(toJSON(dt_output), file = paste0('output/',output_json))
-
 print(output_json)
-```
 
-Write the Data as an R Data File
-
-```{r}
 saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
 print(output_rds)
 

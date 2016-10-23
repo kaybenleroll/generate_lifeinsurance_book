@@ -213,106 +213,23 @@ print(paste(output_csv))</code></pre>
 </div>
 <div id="load-data-from-files" class="section level2">
 <h2><span class="header-section-number">1.2</span> Load Data from Files</h2>
-<p>Load up the smallarea data that comes with the census GIS data</p>
-<pre class="r"><code>dt_smallarea &lt;- fread(&quot;data/smallarea_gisdb.csv&quot;)[, sa_id := geogid]
-t(head(dt_smallarea, 3))</code></pre>
-<pre><code>##            [,1]                   [,2]                   [,3]                  
-## gid        &quot;1&quot;                    &quot;2&quot;                    &quot;3&quot;                   
-## nuts1      &quot;IE0&quot;                  &quot;IE0&quot;                  &quot;IE0&quot;                 
-## nuts1name  &quot;Ireland&quot;              &quot;Ireland&quot;              &quot;Ireland&quot;             
-## nuts2      &quot;IE02&quot;                 &quot;IE02&quot;                 &quot;IE02&quot;                
-## nuts2name  &quot;Southern and Eastern&quot; &quot;Southern and Eastern&quot; &quot;Southern and Eastern&quot;
-## nuts3      &quot;IE022&quot;                &quot;IE024&quot;                &quot;IE024&quot;               
-## nuts3name  &quot;Mid-East&quot;             &quot;South-East (IE)&quot;      &quot;South-East (IE)&quot;     
-## county     &quot;15&quot;                   &quot;01&quot;                   &quot;01&quot;                  
-## countyname &quot;Wicklow County&quot;       &quot;Carlow County&quot;        &quot;Carlow County&quot;       
-## csoed      &quot;15039&quot;                &quot;01054&quot;                &quot;01053&quot;               
-## osied      &quot;257005&quot;               &quot;017049&quot;               &quot;017032&quot;              
-## edname     &quot;Aughrim&quot;              &quot;Tinnahinch&quot;           &quot;Marley&quot;              
-## small_area &quot;257005002&quot;            &quot;017049001&quot;            &quot;017032001&quot;           
-## geogid     &quot;A257005002&quot;           &quot;A017049001&quot;           &quot;A017032001&quot;          
-## male2011   &quot;137&quot;                  &quot;186&quot;                  &quot;194&quot;                 
-## female2011 &quot;138&quot;                  &quot;176&quot;                  &quot;173&quot;                 
-## total2011  &quot;275&quot;                  &quot;362&quot;                  &quot;367&quot;                 
-## ppocc2011  &quot; 84&quot;                  &quot;111&quot;                  &quot;121&quot;                 
-## unocc2011  &quot;18&quot;                   &quot;25&quot;                   &quot; 8&quot;                  
-## vacant2011 &quot;15&quot;                   &quot;24&quot;                   &quot; 5&quot;                  
-## hs2011     &quot;102&quot;                  &quot;136&quot;                  &quot;129&quot;                 
-## pcvac2011  &quot;14.7&quot;                 &quot;17.6&quot;                 &quot; 3.9&quot;                
-## sa_id      &quot;A257005002&quot;           &quot;A017049001&quot;           &quot;A017032001&quot;</code></pre>
-<p>Load up the clustering info for the small areas</p>
-<pre class="r"><code>dt_clustersmallarea &lt;- melt(fread(&quot;data/aai_censusclusterids.csv&quot;), id = 'sa_id')[
+<pre class="r"><code># Load up the smallarea data that comes with the census GIS data
+dt_smallarea &lt;- fread(&quot;data/smallarea_gisdb.csv&quot;)[, sa_id := geogid]
+
+# Load up the clustering info for the small areas
+dt_clustersmallarea &lt;- melt(fread(&quot;data/aai_censusclusterids.csv&quot;), id = 'sa_id')[
     ,cluster_id := paste0(variable, &quot;_c&quot;, value)][
     ,.(sa_id, cluster_level = variable, cluster_id)]
 
-head(dt_clustersmallarea)</code></pre>
-<pre><code>##         sa_id cluster_level cluster_id
-## 1: A017001001            n2      n2_c1
-## 2: A017002001            n2      n2_c1
-## 3: A017002002            n2      n2_c1
-## 4: A017002003            n2      n2_c1
-## 5: A017003001            n2      n2_c0
-## 6: A017003002            n2      n2_c1</code></pre>
-<p>Load the cluster proportions in the policy book</p>
-<pre class="r"><code>dt_clusterpolicyprop &lt;- fread(&quot;data/cluster_policy_proportions.csv&quot;)
-head(dt_clusterpolicyprop)</code></pre>
-<pre><code>##    cluster_level cluster_id                        cluster_name proportion
-## 1:            n6      n6_c0                 Urban Working Young       0.20
-## 2:            n6      n6_c1 Traditional and Remote Agricultural       0.10
-## 3:            n6      n6_c2                  Heartland Families       0.15
-## 4:            n6      n6_c3                 Urban Disadvantaged       0.05
-## 5:            n6      n6_c4  Established Suburban Professionals       0.30
-## 6:            n6      n6_c5     Aspirational Commuting Families       0.20
-##    mort_shape mort_scale
-## 1:          2          3
-## 2:          3          2
-## 3:          3          2
-## 4:          3          3
-## 5:          2          2
-## 6:          2          3</code></pre>
-<p>Load the cluster propensities for the four product types</p>
-<pre class="r"><code>dt_clusterproductmapping &lt;- fread(&quot;data/cluster_product_mapping.csv&quot;)
-head(dt_clusterproductmapping)</code></pre>
-<pre><code>##    cluster_level cluster_id                        cluster_name savings
-## 1:            n6      n6_c0                 Urban Working Young    0.15
-## 2:            n6      n6_c1 Traditional and Remote Agricultural    0.10
-## 3:            n6      n6_c2                  Heartland Families    0.30
-## 4:            n6      n6_c3                 Urban Disadvantaged    0.10
-## 5:            n6      n6_c4  Established Suburban Professionals    0.30
-## 6:            n6      n6_c5     Aspirational Commuting Families    0.15
-##    protection pension  arf
-## 1:       0.59    0.25 0.01
-## 2:       0.69    0.20 0.01
-## 3:       0.59    0.10 0.01
-## 4:       0.79    0.10 0.01
-## 5:       0.20    0.40 0.10
-## 6:       0.70    0.10 0.05</code></pre>
-<p>Load product data</p>
-<pre class="r"><code>dt_productdata &lt;- fread(&quot;data/product_input_data.csv&quot;)
-head(dt_productdata)</code></pre>
-<pre><code>##     prod_type age_min age_max age_mean age_sd prem_sp_prop prem_multiplier
-## 1:    savings      18      90       40     10          0.2               5
-## 2: protection      16      70       40     10          0.0               1
-## 3:    pension      18      65       40     10          0.3               5
-## 4:        arf      50      90       70     10          1.0              50
-##    prem_min
-## 1:      600
-## 2:      120
-## 3:      600
-## 4:     1000</code></pre>
-<pre class="r"><code>dt_productdurprop &lt;- fread(&quot;data/product_duration_data.csv&quot;)
-head(dt_productdurprop, 10)</code></pre>
-<pre><code>##      prod_type duration prop
-##  1: protection        5 0.10
-##  2: protection       10 0.15
-##  3: protection       15 0.15
-##  4: protection       20 0.30
-##  5: protection       25 0.05
-##  6: protection       30 0.05
-##  7: protection       35 0.20
-##  8:    savings       10 0.30
-##  9:    savings       20 0.50
-## 10:    savings       -1 0.20</code></pre>
+# Load the cluster proportions in the policy book
+dt_clusterpolicyprop &lt;- fread(&quot;data/cluster_policy_proportions.csv&quot;)
+
+# Load the cluster propensities for the four product types
+dt_clusterproductmapping &lt;- fread(&quot;data/cluster_product_mapping.csv&quot;)
+
+# Load product data
+dt_productdata    &lt;- fread(&quot;data/product_input_data.csv&quot;)
+dt_productdurprop &lt;- fread(&quot;data/product_duration_data.csv&quot;)</code></pre>
 </div>
 </div>
 <div id="create-policy-data" class="section level1">
@@ -325,8 +242,9 @@ policy_id &lt;- sprintf(&quot;C%09d&quot;, policy_id)</code></pre>
 <p>First randomly select a cluster for the policy and use this to set a small area</p>
 <pre class="r"><code>dt_smallarea &lt;- merge(dt_smallarea
                       ,dt_clustersmallarea[cluster_level %in% use_cluster_level]
-                      ,by = 'sa_id')</code></pre>
-<pre class="r"><code>dt_policyprop  &lt;- dt_clusterpolicyprop[cluster_level == use_cluster_level]
+                      ,by = 'sa_id')
+
+dt_policyprop  &lt;- dt_clusterpolicyprop[cluster_level == use_cluster_level]
 cluster_count  &lt;- dt_policyprop[, .N]
 
 cluster_idx &lt;- sample(1:cluster_count, N, prob = dt_policyprop$proportion, replace = TRUE)
@@ -334,47 +252,26 @@ cluster_id  &lt;- dt_policyprop[cluster_idx]$cluster_id
 
 
 dt_clusterprod &lt;- melt(dt_clusterproductmapping
-                       ,id = c(&quot;cluster_level&quot;, &quot;cluster_id&quot;, &quot;cluster_name&quot;))</code></pre>
-<pre class="r"><code>dt_policy &lt;- rbindlist(lapply(unique(cluster_id), sample_cluster_data, dt_smallarea, dt_clusterprod, cluster_id))
+                       ,id = c(&quot;cluster_level&quot;, &quot;cluster_id&quot;, &quot;cluster_name&quot;))
+
+dt_policy &lt;- rbindlist(lapply(unique(cluster_id), sample_cluster_data, dt_smallarea, dt_clusterprod, cluster_id))
 dt_policy[, policy_id := policy_id]</code></pre>
-<pre class="r"><code>head(dt_policy)</code></pre>
-<pre><code>##    cluster_id      sa_id  prod_type  idx  policy_id
-## 1:      n6_c2 A267151013 protection 3653 C009233255
-## 2:      n6_c2 A027018002 protection   78 C009433678
-## 3:      n6_c2 A217055014 protection 2492 C003575255
-## 4:      n6_c2 A127003001 protection 1548 C008474026
-## 5:      n6_c2 A107071004 protection 1499 C006775707
-## 6:      n6_c2 A047221013 protection  473 C005671861</code></pre>
 <pre class="r"><code>### For each prod_type we create some data and then bind the data.tables together
 dt_product &lt;- rbindlist(lapply(dt_policy[, sort(unique(prod_type))]
                               ,sample_product_data
                               ,dt_productdata
                               ,premape_shape = premape_shape
                               ,premape_scale = premape_scale
-                              ))</code></pre>
-<pre class="r"><code>dt_product[, policy_id := dt_policy[prod_type == .BY$prod_type]$policy_id, by = prod_type]
+                              ))
+
+dt_product[, policy_id := dt_policy[prod_type == .BY$prod_type]$policy_id, by = prod_type]
 dt_policy[,  prod_type := NULL]
 
 dt_policy &lt;- merge(dt_policy, dt_product, by = 'policy_id')</code></pre>
-<pre class="r"><code>head(dt_policy)</code></pre>
-<pre><code>##     policy_id cluster_id      sa_id  idx  prod_type prem_type policy_startage
-## 1: C001000073      n6_c2 A267104015 3462    savings        RP              28
-## 2: C001000236      n6_c2 A097066001 1396    savings        RP              39
-## 3: C001000287      n6_c4 A268041009 1618    pension        RP              35
-## 4: C001000397      n6_c4 A047178001   99    pension        RP              41
-## 5: C001000423      n6_c4 A267114001 1290    pension        RP              45
-## 6: C001000443      n6_c2 A167035003 2036 protection        RP              43
-##    prem_ape
-## 1:   600.00
-## 2:   600.00
-## 3:  2293.18
-## 4:  2248.61
-## 5:  4587.90
-## 6:   579.68</code></pre>
 <pre class="r"><code>### Create some datetime values
 start_dates &lt;- seq(data_startdate, data_snapshotdate, by = 'day')
 
-invisible(dt_policy[, policy_startdate := sample(start_dates, N, replace = TRUE)])
+dt_policy[, policy_startdate := sample(start_dates, N, replace = TRUE)]
 
 day_modifier &lt;- sample(1:365, N, replace = TRUE) - 1
 dt_policy[, dob_life1 := policy_startdate - (365 * policy_startage)]
@@ -387,8 +284,9 @@ dt_policy[prem_type == &quot;RP&quot;, prem_freq := sample(names(prem_freq_prop)
 
 dt_policy[prem_type == 'RP' &amp;
           prem_freq == '4'  &amp;
-          policy_startdate &gt;= prem_freq_cutoff, prem_freq := '12']</code></pre>
-<pre class="r"><code>### Create gender and gender-related variables
+          policy_startdate &gt;= prem_freq_cutoff, prem_freq := '12']
+
+### Create gender and gender-related variables
 dt_policy[, gender_life1 := sample(c(&quot;M&quot;, &quot;F&quot;)
                                   ,N
                                   ,replace = TRUE
@@ -458,27 +356,8 @@ dt_policy[prod_type == 'protection'
 dt_policy[prod_type == 'protection', isjointlife := rbinom(.N, 1, jointlife_prop) == 1]
 dt_policy[prod_type == 'protection', islifeonly  := rbinom(.N, 1, lifeonly_prop)  == 1]
 
-t(head(dt_policy,3))</code></pre>
-<pre><code>##                  [,1]         [,2]         [,3]        
-## policy_id        &quot;C001000073&quot; &quot;C001000236&quot; &quot;C001000287&quot;
-## cluster_id       &quot;n6_c2&quot;      &quot;n6_c2&quot;      &quot;n6_c4&quot;     
-## sa_id            &quot;A267104015&quot; &quot;A097066001&quot; &quot;A268041009&quot;
-## idx              &quot;3462&quot;       &quot;1396&quot;       &quot;1618&quot;      
-## prod_type        &quot;savings&quot;    &quot;savings&quot;    &quot;pension&quot;   
-## prem_type        &quot;RP&quot;         &quot;RP&quot;         &quot;RP&quot;        
-## policy_startage  &quot;28&quot;         &quot;39&quot;         &quot;35&quot;        
-## prem_ape         &quot; 600.00&quot;    &quot; 600.00&quot;    &quot;2293.18&quot;   
-## policy_startdate &quot;2007-08-25&quot; &quot;1997-07-21&quot; &quot;1991-01-25&quot;
-## dob_life1        &quot;1979-04-23&quot; &quot;1957-12-20&quot; &quot;1955-05-14&quot;
-## prem_freq        &quot;12&quot;         &quot;12&quot;         &quot;12&quot;        
-## gender_life1     &quot;M&quot;          &quot;M&quot;          &quot;F&quot;         
-## smoker_life1     &quot;Q&quot;          &quot;N&quot;          &quot;N&quot;         
-## policy_duration  NA           &quot;20&quot;         NA          
-## policy_enddate   &quot;2099-04-23&quot; &quot;2017-07-21&quot; &quot;2075-05-14&quot;
-## mortgage_status  NA           NA           NA          
-## isjointlife      NA           NA           NA          
-## islifeonly       NA           NA           NA</code></pre>
-<pre class="r"><code>### Add a mortality rating to protection policies
+
+### Add a mortality rating to protection policies
 dt_policy[prod_type == 'protection'
          ,mort_rating := calculate_mort_rating(.N
                                               ,dt_clusterpolicyprop[cluster_id == .BY$cluster_id, mort_shape]
@@ -519,8 +398,9 @@ dt_policy[prod_type == 'protection'
                                                         ,islifeonly
                                                         ,acttables     = act_tables
                                                         ,interest_rate = interest_rate)
-         ,by = policy_id]</code></pre>
-<pre class="r"><code>dt_policy[prod_type == 'protection'
+         ,by = policy_id]
+
+dt_policy[prod_type == 'protection'
          ,sum_assured := 100000 + 50000 * sample(0:8, .N, replace = TRUE)]
 
 dt_policy[prod_type == 'protection'
@@ -530,56 +410,7 @@ dt_policy[prod_type == 'protection'
          ,prem_risk := (sum_assured * premium_factor * mort_rating / 100)]
 
 dt_policy[prod_type == 'protection' &amp; mortgage_status == 'MORTDECR'
-         ,prem_risk := prem_risk * 0.7]
-
-t(head(dt_policy,3))</code></pre>
-<pre><code>##                  [,1]         [,2]         [,3]        
-## policy_id        &quot;C001000073&quot; &quot;C001000236&quot; &quot;C001000287&quot;
-## cluster_id       &quot;n6_c2&quot;      &quot;n6_c2&quot;      &quot;n6_c4&quot;     
-## sa_id            &quot;A267104015&quot; &quot;A097066001&quot; &quot;A268041009&quot;
-## idx              &quot;3462&quot;       &quot;1396&quot;       &quot;1618&quot;      
-## prod_type        &quot;savings&quot;    &quot;savings&quot;    &quot;pension&quot;   
-## prem_type        &quot;RP&quot;         &quot;RP&quot;         &quot;RP&quot;        
-## policy_startage  &quot;28&quot;         &quot;39&quot;         &quot;35&quot;        
-## prem_ape         &quot; 600.00&quot;    &quot; 600.00&quot;    &quot;2293.18&quot;   
-## policy_startdate &quot;2007-08-25&quot; &quot;1997-07-21&quot; &quot;1991-01-25&quot;
-## dob_life1        &quot;1979-04-23&quot; &quot;1957-12-20&quot; &quot;1955-05-14&quot;
-## prem_freq        &quot;12&quot;         &quot;12&quot;         &quot;12&quot;        
-## gender_life1     &quot;M&quot;          &quot;M&quot;          &quot;F&quot;         
-## smoker_life1     &quot;Q&quot;          &quot;N&quot;          &quot;N&quot;         
-## policy_duration  NA           &quot;20&quot;         NA          
-## policy_enddate   &quot;2099-04-23&quot; &quot;2017-07-21&quot; &quot;2075-05-14&quot;
-## mortgage_status  NA           NA           NA          
-## isjointlife      NA           NA           NA          
-## islifeonly       NA           NA           NA          
-## mort_rating      NA           NA           NA          
-## premium_factor   NA           NA           NA          
-## sum_assured      NA           NA           NA          
-## prem_risk        NA           NA           NA</code></pre>
-<pre class="r"><code>t(head(dt_policy[prod_type == 'protection'],3))</code></pre>
-<pre><code>##                  [,1]         [,2]         [,3]        
-## policy_id        &quot;C001000443&quot; &quot;C001000446&quot; &quot;C001000779&quot;
-## cluster_id       &quot;n6_c2&quot;      &quot;n6_c5&quot;      &quot;n6_c0&quot;     
-## sa_id            &quot;A167035003&quot; &quot;A267140020&quot; &quot;A147019026&quot;
-## idx              &quot;2036&quot;       &quot;1047&quot;       &quot;1596&quot;      
-## prod_type        &quot;protection&quot; &quot;protection&quot; &quot;protection&quot;
-## prem_type        &quot;RP&quot;         &quot;RP&quot;         &quot;RP&quot;        
-## policy_startage  &quot;43&quot;         &quot;34&quot;         &quot;42&quot;        
-## prem_ape         &quot; 579.68&quot;    &quot; 120.00&quot;    &quot;1021.22&quot;   
-## policy_startdate &quot;1997-07-12&quot; &quot;2004-05-12&quot; &quot;2009-11-09&quot;
-## dob_life1        &quot;1954-03-21&quot; &quot;1970-03-24&quot; &quot;1967-08-11&quot;
-## prem_freq        &quot;12&quot;         &quot;12&quot;         &quot;12&quot;        
-## gender_life1     &quot;M&quot;          &quot;M&quot;          &quot;M&quot;         
-## smoker_life1     &quot;S&quot;          &quot;Q&quot;          &quot;N&quot;         
-## policy_duration  &quot;20&quot;         &quot;35&quot;         &quot;10&quot;        
-## policy_enddate   &quot;2017-07-12&quot; &quot;2039-05-12&quot; &quot;2019-11-09&quot;
-## mortgage_status  &quot;MORTDECR&quot;   &quot;MORTDECR&quot;   &quot;MORTDECR&quot;  
-## isjointlife      &quot;FALSE&quot;      &quot;FALSE&quot;      &quot;FALSE&quot;     
-## islifeonly       &quot; TRUE&quot;      &quot;FALSE&quot;      &quot; TRUE&quot;     
-## mort_rating      &quot;200&quot;        &quot;150&quot;        &quot;100&quot;       
-## premium_factor   &quot;0.00395397&quot; &quot;0.00873132&quot; &quot;0.00233884&quot;
-## sum_assured      &quot;3e+05&quot;      &quot;2e+05&quot;      &quot;2e+05&quot;     
-## prem_risk        &quot;1660.666&quot;   &quot;1833.576&quot;   &quot; 327.437&quot;</code></pre>
+         ,prem_risk := prem_risk * 0.7]</code></pre>
 <pre class="r"><code>### Once we have calculated a premium, we need to add a margin for
 ### expenses and for profit margin etc.
 ### We have set this as an additional 30% to the premium
@@ -600,31 +431,7 @@ dt_output &lt;- dt_policy[, .(policy_id,countyname,edname,nuts3name,sa_id,cluste
 
 setkey(dt_output, policy_id)
 
-t(head(dt_output,3))</code></pre>
-<pre><code>##                  [,1]         [,2]              [,3]             
-## policy_id        &quot;C001000073&quot; &quot;C001000236&quot;      &quot;C001000287&quot;     
-## countyname       &quot;Fingal&quot;     &quot;Kilkenny County&quot; &quot;Dublin City&quot;    
-## edname           &quot;Lusk&quot;       &quot;Killamery&quot;       &quot;Clontarf East A&quot;
-## nuts3name        &quot;Dublin&quot;     &quot;South-East (IE)&quot; &quot;Dublin&quot;         
-## sa_id            &quot;A267104015&quot; &quot;A097066001&quot;      &quot;A268041009&quot;     
-## cluster_id       &quot;n6_c2&quot;      &quot;n6_c2&quot;           &quot;n6_c4&quot;          
-## prod_type        &quot;savings&quot;    &quot;savings&quot;         &quot;pension&quot;        
-## prem_type        &quot;RP&quot;         &quot;RP&quot;              &quot;RP&quot;             
-## prem_freq        &quot;12&quot;         &quot;12&quot;              &quot;12&quot;             
-## prem_ape         &quot; 600.00&quot;    &quot; 600.00&quot;         &quot;2293.18&quot;        
-## prem_risk        NA           NA                NA               
-## policy_startdate &quot;2007-08-25&quot; &quot;1997-07-21&quot;      &quot;1991-01-25&quot;     
-## policy_enddate   &quot;2099-04-23&quot; &quot;2017-07-21&quot;      &quot;2075-05-14&quot;     
-## policy_duration  NA           &quot;20&quot;              NA               
-## mort_rating      NA           NA                NA               
-## sum_assured      NA           NA                NA               
-## dob_life1        &quot;1979-04-23&quot; &quot;1957-12-20&quot;      &quot;1955-05-14&quot;     
-## gender_life1     &quot;M&quot;          &quot;M&quot;               &quot;F&quot;              
-## smoker_life1     &quot;Q&quot;          &quot;N&quot;               &quot;N&quot;              
-## isjointlife      NA           NA                NA               
-## islifeonly       NA           NA                NA               
-## mortgage_status  NA           NA                NA</code></pre>
-<pre class="r"><code>dt_output[, quantile(prem_ape, 0.50, na.rm = TRUE), by = prod_type]</code></pre>
+dt_output[, quantile(prem_ape, 0.50, na.rm = TRUE), by = prod_type]</code></pre>
 <pre><code>##     prod_type       V1
 ## 1:    savings  1981.12
 ## 2:    pension  1994.91
@@ -641,15 +448,12 @@ t(head(dt_output,3))</code></pre>
          ,file = paste0('output/',output_csv)
          ,row.names = FALSE
          ,fileEncoding = 'UTF-8')
-
 print(output_csv)</code></pre>
 <pre><code>## [1] &quot;dt_policy_00250000.csv&quot;</code></pre>
-<p>Convert the data to JSON and output it</p>
-<pre class="r"><code>write(toJSON(dt_output), file = paste0('output/',output_json))
-
+<pre class="r"><code># Convert the data to JSON and output it
+write(toJSON(dt_output), file = paste0('output/',output_json))
 print(output_json)</code></pre>
 <pre><code>## [1] &quot;lifeins_policybook_00250000.json&quot;</code></pre>
-<p>Write the Data as an R Data File</p>
 <pre class="r"><code>saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
 print(output_rds)</code></pre>
 <pre><code>## [1] &quot;lifeins_policybook_00250000.rds&quot;</code></pre>
