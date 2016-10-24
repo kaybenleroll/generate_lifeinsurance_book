@@ -57,6 +57,16 @@ N <- 100000
 data_startdate    <- as.Date('1990-01-01')
 data_snapshotdate <- as.Date('2015-12-31')
 
+yearchng_dt <- data.table(year = c(1990, 1994, 1995, 1996, 1997, 1998, 1999, 2008, 2009, 2014)
+                         ,chng = c(   1,    1,    1,    1,    1,    1,    1,   -4,   -1,    1)
+                          )
+
+month_weight <- c("Jan" =  3, "Feb" = 10, "Mar" = 10, "Apr" = 10, "May" = 10, "Jun" =  5
+                 ,"Jul" =  5, "Aug" =  5, "Sep" =  7, "Oct" =  7, "Nov" =  7, "Dec" =  2)
+
+dow_weight <- c("Mon" = 5, "Tue" = 7, "Wed" = 7, "Thu" = 7, "Fri" = 5, "Sat" = 0, "Sun" = 0)
+
+
 
 # prem_freq is distributed such that almost all are monthly payments
 # though a few are yearly
@@ -180,16 +190,44 @@ dt_policy[,  prod_type := NULL]
 dt_policy <- merge(dt_policy, dt_product, by = 'policy_id')
 ```
 
+We now want to build a model for how policies are created over time.
+
 ```{r echo=TRUE}
+allyears_dt <- data.table(year = year(data_startdate):year(data_snapshotdate))
+
+year_dt <- allyears_dt %>%
+    left_join(yearchng_dt, by = 'year') %>%
+    mutate(chng   = ifelse(is.na(chng), 0, chng)
+          ,weight = cumsum(chng)
+           )
+
+month_dt <- data.table(month  = names(month_weight)
+                      ,weight = month_weight
+                       )
+
+dow_dt <- data.table(dow    = names(dow_weight)
+                    ,weight = dow_weight
+                     )
+
+generate_random_startdates(data_startdate, data_snapshotdate, datestr_exclude, year_dt, month_dt, dow_dt)
+
+
+
+
+
+
 ### Create some datetime values
-start_dates <- seq(data_startdate, data_snapshotdate, by = 'day')
 
-dt_policy[, policy_startdate := sample(start_dates, N, replace = TRUE)]
-
-day_modifier <- sample(1:365, N, replace = TRUE) - 1
 dt_policy[, dob_life1 := policy_startdate - (365 * policy_startage)]
-dt_policy[, dob_life1 := dob_life1 - day_modifier]
+dt_policy[, dob_life1 := dob_life1 - sample(1:365, N, replace = TRUE) + 1]
 ```
+
+
+Having created the start date for the policy and some other derived
+date variables from that, we determine the premium type for the policy
+and also ensure that after a certain date, quarterly premium policies
+are no longer generated.
+
 
 ```{r echo=TRUE}
 ### Select the prem_freq for RP policies

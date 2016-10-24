@@ -179,3 +179,57 @@ create_lapse_calculation_function <- function(risk_baseline
 
     return(calculate_lapse_time)
 }
+
+
+generate_random_startdates <- function(N
+                                      ,data_startdate
+                                      ,data_snapshotdate
+                                      ,datestr_exclude
+                                      ,year_weight_dt
+                                      ,month_weight_dt
+                                      ,dow_weight_dt) {
+
+    startdate_universe <- seq(data_startdate, data_snapshotdate, by = 'day')
+    startdate_universe <- startdate_universe[!format(startdate_universe, "%m%d") %in% datestr_exclude]
+
+    year_prob_dt <- data.table(year    = year_weight_dt$year
+                              ,yearstr = year_weight_dt$year
+                              ,yr_prob = gtools::rdirichlet(1, year_weight_dt$weight)[1,]
+                               )
+
+    month_prob_dt <- data.table(month    = month_weight_dt$month
+                               ,monthstr = sprintf("%02d", 1:nrow(month_weight_dt))
+                               ,mn_prob  = gtools::rdirichlet(1, month_weight_dt$weight)[1,]
+                                )
+
+    dow_prob_dt <- data.table(dow     = dow_weight_dt$dow
+                             ,dw_prob = gtools::rdirichlet(1, dow_weight_dt$weight)[1,]
+                              )
+
+    sample_probs_dt <- CJ(year = year_weight_dt$year, month = month_weight_dt$month)
+
+    sample_probs_dt <- sample_probs_dt %>%
+        left_join(year_prob_dt, 'year') %>%
+        left_join(month_prob_dt, 'month') %>%
+        mutate(yearmon = paste0(yearstr, monthstr)
+              ,prob    = yr_prob * mn_prob)
+
+    startdate_ym <- sample(sample_probs_dt$yearmon, N, replace = TRUE, prob = sample_probs_dt$prob)
+
+    ym_count_dt <- data.table(startdate_ym = startdate_ym) %>%
+        group_by(startdate_ym) %>%
+        summarise(count = n()) %>%
+        arrange(startdate_ym)
+
+
+
+    date_data_dt <- data.table(date  = startdate_universe
+                              ,year  = format(startdate_universe, "%Y")
+                              ,month = format(startdate_universe, "%b")
+                              ,dow   = format(startdate_universe, "%a")
+                               )
+
+
+
+    return(ym_count_dt)
+}
