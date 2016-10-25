@@ -189,6 +189,7 @@ generate_random_startdates <- function(N
                                       ,month_weight_dt
                                       ,dow_weight_dt) {
 
+    print(data_startdate); print(data_snapshotdate);
     startdate_universe <- seq(data_startdate, data_snapshotdate, by = 'day')
     startdate_universe <- startdate_universe[!format(startdate_universe, "%m%d") %in% datestr_exclude]
 
@@ -211,7 +212,7 @@ generate_random_startdates <- function(N
     sample_probs_dt <- sample_probs_dt %>%
         left_join(year_prob_dt, 'year') %>%
         left_join(month_prob_dt, 'month') %>%
-        mutate(yearmon = paste0(yearstr, monthstr)
+        mutate(yearmon = paste0(yearstr, "-", monthstr)
               ,prob    = yr_prob * mn_prob)
 
     startdate_ym <- sample(sample_probs_dt$yearmon, N, replace = TRUE, prob = sample_probs_dt$prob)
@@ -219,17 +220,41 @@ generate_random_startdates <- function(N
     ym_count_dt <- data.table(startdate_ym = startdate_ym) %>%
         group_by(startdate_ym) %>%
         summarise(count = n()) %>%
-        arrange(startdate_ym)
+        arrange(startdate_ym) %>%
+        ungroup
+
+    startdates_dt <- map2(ym_count_dt$startdate_ym
+                         ,ym_count_dt$count
+                         ,function(ym, count) generate_random_month_dates(ym, count, dow_dt)) %>%
+        rbindlist %>%
+        arrange(dates)
 
 
-
-    date_data_dt <- data.table(date  = startdate_universe
-                              ,year  = format(startdate_universe, "%Y")
-                              ,month = format(startdate_universe, "%b")
-                              ,dow   = format(startdate_universe, "%a")
-                               )
+    return(startdates_dt)
+}
 
 
+generate_random_month_dates <- function(ym_datestr, N, dow_prob_dt) {
+cat(paste0("Generating start dates for ", ym_datestr, "\n"))
+    start_datestr <- paste0(ym_datestr, "-01")
 
-    return(ym_count_dt)
+    month_count <- Hmisc::monthDays(start_datestr)
+
+    valid_dates <- seq(as.Date(start_datestr), as.Date(paste0(ym_datestr, "-", month_count)), by = 'day')
+
+    dates_dt <- data.table(date    = valid_dates
+                          ,weeknum = format(valid_dates, "%u")
+                          ,dow     = format(valid_dates, "%a")
+                           ) %>%
+        filter(weeknum %in% 1:5
+              ,!format(date, "%m%d") %in% holiday_datestr) %>%
+        inner_join(dow_prob_dt, by = 'dow') %>%
+        mutate(prob = weight / sum(weight)) %>%
+        arrange(date)
+
+    dates <- sample(dates_dt$date, N, replace = TRUE, prob = dates_dt$prob)
+
+    startdates_dt <- data.table(dates = sort(dates))
+
+    return(startdates_dt)
 }

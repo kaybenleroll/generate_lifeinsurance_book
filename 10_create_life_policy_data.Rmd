@@ -50,7 +50,7 @@ This worksheet enables the generation of a fake book of policies for a life insu
 
 ```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
-N <- 100000
+N <- 250000
 
 # data_startdate is the first date at which we start creating policies
 # data_snapshotdate is the date we take the policy 'snapshot'
@@ -66,6 +66,7 @@ month_weight <- c("Jan" =  3, "Feb" = 10, "Mar" = 10, "Apr" = 10, "May" = 10, "J
 
 dow_weight <- c("Mon" = 5, "Tue" = 7, "Wed" = 7, "Thu" = 7, "Fri" = 5, "Sat" = 0, "Sun" = 0)
 
+holiday_datestr <- c("0101", "0317", "1225", "1226")
 
 
 # prem_freq is distributed such that almost all are monthly payments
@@ -175,7 +176,7 @@ dt_policy <- rbindlist(lapply(unique(cluster_id), sample_cluster_data, dt_smalla
 dt_policy[, policy_id := policy_id]
 ```
 
-```{r echo=TRUE}
+```{r generate_product_data, echo=TRUE}
 ### For each prod_type we create some data and then bind the data.tables together
 dt_product <- rbindlist(lapply(dt_policy[, sort(unique(prod_type))]
                               ,sample_product_data
@@ -192,7 +193,7 @@ dt_policy <- merge(dt_policy, dt_product, by = 'policy_id')
 
 We now want to build a model for how policies are created over time.
 
-```{r echo=TRUE}
+```{r generate_policy_startdates, echo=TRUE}
 allyears_dt <- data.table(year = year(data_startdate):year(data_snapshotdate))
 
 year_dt <- allyears_dt %>%
@@ -209,11 +210,15 @@ dow_dt <- data.table(dow    = names(dow_weight)
                     ,weight = dow_weight
                      )
 
-generate_random_startdates(data_startdate, data_snapshotdate, datestr_exclude, year_dt, month_dt, dow_dt)
+startdates <- generate_random_startdates(nrow(dt_policy)
+                                        ,data_startdate
+                                        ,data_snapshotdate
+                                        ,holiday_datestr
+                                        ,year_dt
+                                        ,month_dt
+                                        ,dow_dt)
 
-
-
-
+dt_policy[, policy_startdate := startdates]
 
 
 ### Create some datetime values
@@ -229,7 +234,7 @@ and also ensure that after a certain date, quarterly premium policies
 are no longer generated.
 
 
-```{r echo=TRUE}
+```{r generate_gender_smoker_data, echo=TRUE}
 ### Select the prem_freq for RP policies
 dt_policy[prem_type == "RP", prem_freq := sample(names(prem_freq_prop)
                                                 ,.N
@@ -261,7 +266,7 @@ dt_policy[gender_life1 == 'F'
 
 Estimate the policy duration
 
-```{r echo=TRUE}
+```{r determine_policy_duration, echo=TRUE}
 dt_duration <- dt_policy[, {
     use_dt <- dt_productdurprop[prod_type == .BY$prod_type]
 
@@ -331,7 +336,7 @@ t(head(dt_policy, 3))
 
 Calculate the premium for the protection policies
 
-```{r echo=TRUE}
+```{r calculate_policy_premia, echo=TRUE}
 dt_policy[, policy_startage := as.numeric(floor((policy_startdate - dob_life1) / 365))]
 
 dt_policy[prod_type == 'protection'
@@ -356,7 +361,7 @@ dt_policy[prod_type == 'protection' & mortgage_status == 'MORTDECR'
          ,prem_risk := prem_risk * 0.7]
 ```
 
-```{r echo=TRUE}
+```{r add_expenses_profit_margin, echo=TRUE}
 ### Once we have calculated a premium, we need to add a margin for
 ### expenses and for profit margin etc.
 ### We have set this as an additional 30% to the premium
@@ -367,7 +372,7 @@ dim(dt_policy[prod_type == 'protection' & is.na(policy_duration)])
 ```
 
 
-```{r echo=TRUE}
+```{r generate_geographical_data, echo=TRUE}
 ### Add some geographical information
 dt_policy <- merge(dt_policy, dt_smallarea[, .(sa_id, countyname, edname, nuts3name)]
                    ,by = 'sa_id',all_x = TRUE)
