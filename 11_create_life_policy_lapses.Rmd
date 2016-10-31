@@ -1,27 +1,57 @@
+---
+title: "Life Policy Generation: 11 - Create Life Policy Lapses"
+author: "Mick Cooney"
+date: "1 October 2016"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: yes
+    theme: cerulean
+    css: assets/styles.css
+  pdf_document: default
+---
+
+<!--
+(Title:) Life Policy Generation: 11 - Create Life Policy Lapses
+
+Author: Mick Cooney
+
+Date: 2016
+
+Abstract: This worksheet adds lapse information to the book of life policies.
+
+Keywords: life insurance, insurance, data generation
+
+-->
+
+
+
 
 This worksheet enables the generation of a fake book of policies for a life insurance company in Ireland
 
 
+```{r knit_opts, echo=FALSE}
+knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
 
-
-```{r}
-library(lubridate)
+library(tidyverse)
 library(data.table)
-library(pbapply)
-library(jsonlite)
-```
+library(dtplyr)
 
-## Local Functions
+library(feather)
 
-```{r}
+library(lubridate)
+
 source("custom_functions.R")
+
+set.seed(4211)
 ```
 
 ## Load Input Data
 
 ### Set up input parameters
 
-```{r}
+```{r create_input_parameters, echo=TRUE}
 data_date <- as.Date('2015-12-31')
 
 min_monthly_lapse_prob <- 0.0001
@@ -34,25 +64,19 @@ nonprotection_weibull_scale <- 100
 
 ### Load Data from Files
 
-```{r}
+```{r load_policy_data, echo=TRUE}
 dt_policy <- readRDS("output/lifeins_policybook.rds")
-t(head(dt_policy, 3))
-```
 
-```{r}
 str(dt_policy)
 ```
 
 # Create Additive Lapse Probabilities
 
-```{r}
+```{r create_inputs_basic, echo=TRUE}
 max_length   <- dt_policy[, max(policy_duration, na.rm = TRUE)]
 total_months <- 12 * max_length
-```
 
-#### Create the baseline hazard rate
-
-```{r}
+### Create the baseline hazard rate
 baseline_prob          <- 0.0070
 baseline_higher_prob   <- 0.0085
 baseline_higher_months <- 12
@@ -61,7 +85,7 @@ risk_baseline                           <- rep(baseline_prob, total_months)
 risk_baseline[1:baseline_higher_months] <- baseline_higher_prob
 ```
 
-```{r}
+```{r create_inputs_demographics, echo=TRUE}
 # We will use the following parameters to affect the hazard rate
 #
 # gender_life1:    Male policy holders will lapse more, but this will decrease over time
@@ -72,21 +96,15 @@ risk_baseline[1:baseline_higher_months] <- baseline_higher_prob
 # cluster_id:      This will have a few different effects for a couple of clusters, but most will have no effect.
 # iflifeonly:      This will increase lapses by a small amount as a constant rate if FALSE
 # policy_duration: This will slightly increase the lapse rate if the mortgage is for over 10 years
-```
 
-#### Create the gender hazard rate
-
-```{r}
 gender_prob <- 0.0020
 
 risk_gender        <- rep(0, total_months)
 risk_gender[1:24]  <- gender_prob
 risk_gender[25:36] <- 0.5 * gender_prob
-```
 
-#### Create the smoker hazard rate
 
-```{r}
+### Create the smoker hazard rate
 smoker_prob_initial <-  0.0010
 smoker_prob_later   <- -0.0005
 smoker_prob_quitter <-  0.0020
@@ -99,11 +117,10 @@ risk_smoker[["S"]][1:36]            <- smoker_prob_initial
 risk_smoker[["S"]][49:total_months] <- smoker_prob_later
 
 risk_smoker[["Q"]][37:total_months] <- smoker_prob_quitter
-```
 
-#### Create the mortgage_status hazard rate
 
-```{r}
+### Create the mortgage_status hazard rate
+
 mortstat_prob_initial <- -0.0005
 mortstat_prob_later   <- +0.0010
 
@@ -118,9 +135,11 @@ risk_mortstat[['MORTFULL']][1:36]            <- mortstat_prob_initial
 risk_mortstat[['MORTFULL']][61:total_months] <- 0.5 * mortstat_prob_later
 ```
 
-#### Create the prem_ape hazard rate
 
-```{r}
+
+```{r create_inputs_premium, echo=TRUE}
+### Create the prem_ape hazard rate
+
 ### For now I'll just go with a fairly straightforward dependency on
 ### prem_ape, where it multiplies the log(prem_ape)
 
@@ -131,9 +150,7 @@ risk_logpremape <- rep(0, total_months)
 
 risk_logpremape[1:24]            <- logpremape_mult_start
 risk_logpremape[48:total_months] <- logpremape_mult_finish
-```
 
-```{r}
 high_premape_start <-  0.0050
 high_premape_end   <- -0.0030
 
@@ -141,11 +158,9 @@ risk_highpremape <- rep(0, total_months)
 
 risk_highpremape[1:12]            <- high_premape_start
 risk_highpremape[37:total_months] <- high_premape_end
-```
 
-#### Create the cluster_id hazard rate
 
-```{r}
+### Create the cluster_id hazard rate
 c4_prob         <- -0.0010
 c5_prob_initial <-  0.0050
 c5_prob_later   <-  0.0020
@@ -163,9 +178,8 @@ risk_cluster[['n6_c5']][1:24]            <- c5_prob_initial
 risk_cluster[['n6_c5']][37:total_months] <- c5_prob_later
 ```
 
-#### Create the data to allow calculation of the calendar effect
-
-```{r}
+```{r create_inputs_calendar, echo=TRUE}
+### Create the data to allow calculation of the calendar effect
 dt_calendar <- data.table(calc_date   = c(as.Date("1900-01-01"), as.Date('2008-01-01')
                                          ,as.Date('2009-01-01'), as.Date('2012-01-01')
                                          ,as.Date('2013-01-01'))
@@ -174,13 +188,9 @@ dt_calendar <- data.table(calc_date   = c(as.Date("1900-01-01"), as.Date('2008-0
 setkey(dt_calendar, calc_date)
 ```
 
-```{r}
-dt_calendar
-```
 
-#### Use the above additive hazards to create the lapse function
-
-```{r}
+```{r calculate_lapse_months, echo=TRUE}
+### Use the above additive hazards to create the lapse function
 ### create_lapse_calculation_function is a function that returns a function
 calculate_lapse_month <- create_lapse_calculation_function(risk_baseline
                                                           ,risk_gender
@@ -193,83 +203,54 @@ calculate_lapse_month <- create_lapse_calculation_function(risk_baseline
                                                           ,min_monthly_lapse_prob = min_monthly_lapse_prob
                                                           ,premape_high           = premape_high
                                                           )
-```
 
-```{r}
 dt_policy[prod_type != 'protection'
-                    ,lapse_month := as.integer(round(rweibull(.N
-                                                              ,nonprotection_weibull_shape
-                                                              ,nonprotection_weibull_scale),0))]
-```
+         ,lapse_month := as.integer(round(rweibull(.N
+                                                  ,nonprotection_weibull_shape
+                                                  ,nonprotection_weibull_scale), 0))]
 
-```{r}
 dt_policy[prod_type == 'protection'
-                    ,lapse_month := calculate_lapse_month(.SD), by = policy_id]
-```
+         ,lapse_month := as.integer(calculate_lapse_month(.SD)), by = policy_id]
 
-```{r}
-t(head(dt_policy[prod_type == 'protection'], 3))
-```
-
-```{r}
 str(dt_policy)
 ```
 
 
 ## Use Lapse Month to Determine Lapses and Set policy_status
 
-```{r}
+```{r determine_lapses, echo=TRUE}
 ### policy_lapsedate is the possibly-future date that the policy lapses
-dt_policy[,policy_lapsedate := policy_startdate %m+% months(lapse_month)]
+dt_policy[, policy_lapsedate := policy_startdate %m+% months(lapse_month)]
 
 
 ### First we look at policies where policy_enddate is prior to the snapshot date
 dt_policy[policy_enddate <= data_date
-                    ,policy_status := ifelse(policy_lapsedate > policy_enddate, 'completed', 'lapsed')]
+         ,policy_status := ifelse(policy_lapsedate > policy_enddate, 'completed', 'lapsed')]
 
 ### Now we set the status for policies with policy_enddate after the snapshot date
 dt_policy[policy_enddate > data_date
-                    ,policy_status := ifelse(policy_lapsedate < data_date, 'lapsed', 'inforce')]
-```
+         ,policy_status := ifelse(policy_lapsedate < data_date, 'lapsed', 'inforce')]
 
-```{r}
 ### We set policy_statuschangedate according to policy_status
 dt_policy[policy_status == 'inforce',   policy_statuschangedate := policy_startdate]
 dt_policy[policy_status == 'lapsed',    policy_statuschangedate := policy_lapsedate]
 dt_policy[policy_status == 'completed', policy_statuschangedate := policy_enddate]
+
+dt_policy[, lapsed := (policy_status == 'lapsed')]
+
+
+dt_policy %>%
+    group_by(lapsed) %>%
+    summarise(count = n())
+
+dt_policy %>%
+    group_by(prod_type, lapsed) %>%
+    summarise(count = n()) %>%
+    arrange(prod_type, lapsed)
+
 ```
 
-
-```{r}
-t(head(dt_policy,3))
-```
-
-```{r}
-dt_policy[,lapsed := (policy_status == 'lapsed')]
-```
-
-```{r}
-t(head(dt_policy[is.na(policy_status)]))
-```
-
-```{r}
-dt_policy[, .N, by = lapsed]
-```
-
-```{r}
-dt_policy[, .N, by = .(prod_type, lapsed)][order(prod_type, lapsed)]
-```
-
-```{r}
-dim(dt_policy[prod_type == 'protection'][lapse_month == 0])
-```
-
-```{r}
-t(dt_policy[is.na(lapsed)])
-```
-
-
-```{r}
+```{r create_output_data, echo=TRUE}
 dt_output <- dt_policy[, .(policy_id,countyname,edname,nuts3name,sa_id,cluster_id,prod_type
                            ,prem_type,prem_freq,prem_ape,prem_risk,policy_startdate,policy_enddate
                            ,policy_duration,mort_rating,sum_assured
@@ -277,41 +258,28 @@ dt_output <- dt_policy[, .(policy_id,countyname,edname,nuts3name,sa_id,cluster_i
                            ,mortgage_status,policy_status,policy_statuschangedate,lapsed)];
 
 setkey(dt_output, policy_id);
+
+
+dt_output %>%
+    filter(policy_statuschangedate != policy_startdate
+          ,policy_statuschangedate != policy_enddate) %>%
+    group_by(lapsed) %>%
+    summarise(count = n())
 ```
 
-```{r}
-t(head(dt_output,3))
-```
-
-```{r}
-dt_output[policy_statuschangedate != policy_startdate &
-          policy_statuschangedate != policy_enddate][, .N, by = lapsed]
-```
-
-```{r}
-t(head(dt_output[policy_statuschangedate > as.Date('2015-12-31')],3))
-```
 
 
 # Output Data
 
-## Write the CSV data out to files
+We write out our data to the output directory using a variety of data formats.
 
-```{r}
-write.csv(dt_output
-          ,file = 'output/dt_policy_inoutforce.csv'
-          ,row.names = FALSE
-          ,fileEncoding = 'UTF-8');
-```
+```{r output_data, echo=TRUE}
+write_csv    (dt_output, path = 'output/dt_policy_inoutforce.csv')
+write_feather(dt_output, path = 'output/dt_policy_inoutforce.feather')
 
 ## Convert the data to JSON and output it
-
-```{r}
-write(toJSON(dt_output), file = 'output/lifeins_policybook_inoutforce.json')
-```
+write(jsonlite::toJSON(dt_output), file = 'output/lifeins_policybook_inoutforce.json')
 
 ## Write the Data as an R Data File
-
-```{r}
 saveRDS(dt_output, file = 'output/lifeins_policybook_inoutforce.rds', compress = 'xz')
 ```

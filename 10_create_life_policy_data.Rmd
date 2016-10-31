@@ -29,9 +29,10 @@ Keywords: life insurance, insurance, data generation
 knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
 
 library(tidyverse)
-
 library(data.table)
 library(dtplyr)
+
+library(feather)
 
 library(lifecontingencies)
 
@@ -50,7 +51,7 @@ This worksheet enables the generation of a fake book of policies for a life insu
 
 ```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
-N <- 250000
+N <- 500000
 
 # data_startdate is the first date at which we start creating policies
 # data_snapshotdate is the date we take the policy 'snapshot'
@@ -112,9 +113,10 @@ act_tables <- list(m_lifetable       = m_lifetable
                   ,mn_morb_lifetable = mn_morb_lifetable
                   ,fn_morb_lifetable = fn_morb_lifetable)
 
-output_csv  <- sprintf("dt_policy_%08d.csv", N)
-output_json <- sprintf("lifeins_policybook_%08d.json", N)
-output_rds  <- sprintf("lifeins_policybook_%08d.rds", N)
+output_csv      <- sprintf("dt_policy_%08d.csv", N)
+output_feather  <- sprintf("dt_policy_%08d.feather", N)
+output_json     <- sprintf("lifeins_policybook_%08d.json", N)
+output_rds      <- sprintf("lifeins_policybook_%08d.rds", N)
 
 output_intermediate_rds  <- sprintf("lifeins_policybook.rds", N)
 
@@ -397,20 +399,14 @@ ggplot(dt_output %>% filter(prod_type == 'protection')) +
 Write the CSV data out to files
 
 ```{r output_data, echo=TRUE}
-write.csv(dt_output
-         ,file = paste0('output/',output_csv)
-         ,row.names = FALSE
-         ,fileEncoding = 'UTF-8')
-print(output_csv)
-
+write_csv    (dt_output, path = paste0('output/', output_csv))
+write_feather(dt_output, path = paste0('output/', output_feather))
 
 # Convert the data to JSON and output it
 write(jsonlite::toJSON(dt_output), file = paste0('output/',output_json))
-print(output_json)
 
 saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
-print(output_rds)
-
 saveRDS(dt_output, file = paste0('output/',output_intermediate_rds), compress = 'xz')
-print(output_intermediate_rds)
+
+
 ```
