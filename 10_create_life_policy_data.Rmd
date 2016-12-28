@@ -51,7 +51,11 @@ This worksheet enables the generation of a fake book of policies for a life insu
 
 ```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
-N <- 500000
+N <- 200000
+
+output_dir <- 'output'
+input_dir  <- 'data'
+
 
 # data_startdate is the first date at which we start creating policies
 # data_snapshotdate is the date we take the policy 'snapshot'
@@ -106,7 +110,7 @@ premium_expense_ratio <- 0.4
 interest_rate <- 0.04
 
 # We load some lifetable and morbidity data to price the protection policies
-load("data/lifemorb_tables.rda")
+load(paste0(input_dir, "/lifemorb_tables.rda"))
 
 act_tables <- list(m_lifetable       = m_lifetable
                   ,f_lifetable       = f_lifetable
@@ -128,22 +132,22 @@ print(paste(output_csv))
 
 ```{r load_datafiles, echo=TRUE}
 # Load up the smallarea data that comes with the census GIS data
-dt_smallarea <- fread("data/smallarea_gisdb.csv")[, sa_id := geogid]
+dt_smallarea <- fread(paste0(input_dir, "/smallarea_gisdb.csv"))[, sa_id := geogid]
 
 # Load up the clustering info for the small areas
-dt_clustersmallarea <- melt(fread("data/aai_censusclusterids.csv"), id = 'sa_id')[
+dt_clustersmallarea <- melt(fread(paste0(input_dir, "/aai_censusclusterids.csv")), id = 'sa_id')[
     ,cluster_id := paste0(variable, "_c", value)][
     ,.(sa_id, cluster_level = variable, cluster_id)]
 
 # Load the cluster proportions in the policy book
-dt_clusterpolicyprop <- fread("data/cluster_policy_proportions.csv")
+dt_clusterpolicyprop <- fread(paste0(input_dir, "/cluster_policy_proportions.csv"))
 
 # Load the cluster propensities for the four product types
-dt_clusterproductmapping <- fread("data/cluster_product_mapping.csv")
+dt_clusterproductmapping <- fread(paste0(input_dir, "/cluster_product_mapping.csv"))
 
 # Load product data
-dt_productdata    <- fread("data/product_input_data.csv")
-dt_productdurprop <- fread("data/product_duration_data.csv")
+dt_productdata    <- fread(paste0(input_dir, "/product_input_data.csv"))
+dt_productdurprop <- fread(paste0(input_dir, "/product_duration_data.csv"))
 ```
 
 # Create Policy Data
@@ -399,14 +403,12 @@ ggplot(dt_output %>% filter(prod_type == 'protection')) +
 Write the CSV data out to files
 
 ```{r output_data, echo=TRUE}
-write_csv    (dt_output, path = paste0('output/', output_csv))
-write_feather(dt_output, path = paste0('output/', output_feather))
+write_csv    (dt_output, path = paste0(output_dir, '/', output_csv))
+write_feather(dt_output, path = paste0(output_dir, '/', output_feather))
 
 # Convert the data to JSON and output it
-write(jsonlite::toJSON(dt_output), file = paste0('output/',output_json))
+write(jsonlite::toJSON(dt_output), file = paste0(output_dir, '/',output_json))
 
-saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
-saveRDS(dt_output, file = paste0('output/',output_intermediate_rds), compress = 'xz')
-
-
+saveRDS(dt_output, file = paste0(output_dir, '/',output_rds),              compress = 'xz')
+saveRDS(dt_output, file = paste0(output_dir, '/',output_intermediate_rds), compress = 'xz')
 ```
