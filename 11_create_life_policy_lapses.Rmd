@@ -282,4 +282,9 @@ write(jsonlite::toJSON(dt_output), file = 'output/lifeins_policybook_inoutforce.
 
 ## Write the Data as an R Data File
 saveRDS(dt_output, file = 'output/lifeins_policybook_inoutforce.rds', compress = 'xz')
+
+
+## Write standard files
+write_csv    (dt_output, path = 'output/lifebook_data.csv')
+write_feather(dt_output, path = 'output/lifebook_data.feather')
 ```

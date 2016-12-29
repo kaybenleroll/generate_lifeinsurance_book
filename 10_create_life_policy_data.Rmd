@@ -51,7 +51,7 @@ This worksheet enables the generation of a fake book of policies for a life insu
 
 ```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
-N <- 200000
+N <- 50000
 
 output_dir <- 'output'
 input_dir  <- 'data'
@@ -103,7 +103,10 @@ large_amount_prop    <- 0.05
 mortgage_status_prop <- c("TERM" = 0.4, "MORTDECR" = 0.5, "MORTFULL" = 0.1)
 
 # Add 40% to the premium to account for profit margin and expenses
-premium_expense_ratio <- 0.4
+prem_expense_mean <- -1.0
+prem_expense_sd   <-  0.2  
+
+premium_expense_ratio <- rlnorm(N, prem_expense_mean, prem_expense_sd)
 
 
 # Interest rate for discounting time value of money
