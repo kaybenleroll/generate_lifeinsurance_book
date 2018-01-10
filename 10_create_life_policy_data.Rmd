@@ -12,18 +12,6 @@ output:
   pdf_document: default
 ---
 
-<!--
-(Title:) Life Policy Generation: 10 - Create Life Policy Data
-
-Author: Mick Cooney
-
-Date: 2016
-
-Abstract: This worksheet deals with the basics of creating life policy data
-
-Keywords: life insurance, insurance, data generation
-
--->
 
 ```{r knit_opts, include = FALSE}
 knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
@@ -45,13 +33,14 @@ set.seed(42)
 
 # Load Input Data
 
-This worksheet enables the generation of a fake book of policies for a life insurance company in Ireland
+This worksheet enables the generation of a fake book of policies for a life
+insurance company in Ireland
 
 ## Set up input parameters
 
 ```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
-N <- 500000
+N <- 1500000
 
 # data_startdate is the first date at which we start creating policies
 # data_snapshotdate is the date we take the policy 'snapshot'

@@ -195,16 +195,16 @@ generate_random_startdates <- function(N
 
     year_prob_dt <- data.table(year    = year_weight_dt$year
                               ,yearstr = year_weight_dt$year
-                              ,yr_prob = gtools::rdirichlet(1, year_weight_dt$weight)[1,]
+                              ,yr_prob = gtools::rdirichlet(1, 50 * year_weight_dt$weight)[1,]
                                )
 
     month_prob_dt <- data.table(month    = month_weight_dt$month
                                ,monthstr = sprintf("%02d", 1:nrow(month_weight_dt))
-                               ,mn_prob  = gtools::rdirichlet(1, month_weight_dt$weight)[1,]
+                               ,mn_prob  = gtools::rdirichlet(1, 50 * month_weight_dt$weight)[1,]
                                 )
 
     dow_prob_dt <- data.table(dow     = dow_weight_dt$dow
-                             ,dw_prob = gtools::rdirichlet(1, dow_weight_dt$weight)[1,]
+                             ,dw_prob = gtools::rdirichlet(1, 50 * dow_weight_dt$weight)[1,]
                               )
 
     sample_probs_dt <- CJ(year = year_weight_dt$year, month = month_weight_dt$month)
