@@ -19,6 +19,7 @@ knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
 library(tidyverse)
 library(data.table)
 library(dtplyr)
+library(gtools)
 
 library(feather)
 
@@ -41,6 +42,7 @@ insurance company in Ireland
 ```{r initialise_parameters, echo=TRUE}
 # N is the policy count you want to generate
 N <- 1500000
+
 
 # data_startdate is the first date at which we start creating policies
 # data_snapshotdate is the date we take the policy 'snapshot'
@@ -392,7 +394,7 @@ write_csv    (dt_output, path = paste0('output/', output_csv))
 write_feather(dt_output, path = paste0('output/', output_feather))
 
 # Convert the data to JSON and output it
-write(jsonlite::toJSON(dt_output), file = paste0('output/',output_json))
+#write(jsonlite::toJSON(dt_output), file = paste0('output/', output_json))
 
 saveRDS(dt_output, file = paste0('output/',output_rds),              compress = 'xz')
 saveRDS(dt_output, file = paste0('output/',output_intermediate_rds), compress = 'xz')

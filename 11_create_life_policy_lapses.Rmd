@@ -278,7 +278,7 @@ write_csv    (dt_output, path = 'output/dt_policy_inoutforce.csv')
 write_feather(dt_output, path = 'output/dt_policy_inoutforce.feather')
 
 ## Convert the data to JSON and output it
-write(jsonlite::toJSON(dt_output), file = 'output/lifeins_policybook_inoutforce.json')
+#write(jsonlite::toJSON(dt_output), file = 'output/lifeins_policybook_inoutforce.json')
 
 ## Write the Data as an R Data File
 saveRDS(dt_output, file = 'output/lifeins_policybook_inoutforce.rds', compress = 'xz')

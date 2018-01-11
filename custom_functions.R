@@ -193,29 +193,28 @@ generate_random_startdates <- function(N
     startdate_universe <- seq(data_startdate, data_snapshotdate, by = 'day')
     startdate_universe <- startdate_universe[!format(startdate_universe, "%m%d") %in% datestr_exclude]
 
-    year_prob_dt <- data.table(year    = year_weight_dt$year
-                              ,yearstr = year_weight_dt$year
-                              ,yr_prob = gtools::rdirichlet(1, 50 * year_weight_dt$weight)[1,]
+    year_prob_dt <- data.table(year      = year_weight_dt$year
+                              ,yearstr   = year_weight_dt$year
+                              ,year_prop = rdirichlet(1, 20 * year_weight_dt$weight)[1,]
                                )
 
-    month_prob_dt <- data.table(month    = month_weight_dt$month
-                               ,monthstr = sprintf("%02d", 1:nrow(month_weight_dt))
-                               ,mn_prob  = gtools::rdirichlet(1, 50 * month_weight_dt$weight)[1,]
-                                )
+    n_years <- year_prob_dt %>% nrow
 
-    dow_prob_dt <- data.table(dow     = dow_weight_dt$dow
-                             ,dw_prob = gtools::rdirichlet(1, 50 * dow_weight_dt$weight)[1,]
-                              )
+    month_prob_dt <- rdirichlet(n_years, 10 * month_weight_dt$weight) %>%
+        melt %>%
+        mutate(year       = year_prob_dt$year[Var1]
+              ,month      = month_weight_dt$month[Var2]
+              ,monthstr   = sprintf('%02d', Var2)
+              ,month_prop = value
+               )
+    setDT(month_prob_dt)
 
-    sample_probs_dt <- CJ(year = year_weight_dt$year, month = month_weight_dt$month)
+    yearmonth_props_dt <- year_prob_dt %>%
+        left_join(month_prob_dt, by = 'year') %>%
+        mutate(yearmon = paste0(yearstr, '-', monthstr)
+              ,prob    = year_prop * month_prop)
 
-    sample_probs_dt <- sample_probs_dt %>%
-        left_join(year_prob_dt, 'year') %>%
-        left_join(month_prob_dt, 'month') %>%
-        mutate(yearmon = paste0(yearstr, "-", monthstr)
-              ,prob    = yr_prob * mn_prob)
-
-    startdate_ym <- sample(sample_probs_dt$yearmon, N, replace = TRUE, prob = sample_probs_dt$prob)
+    startdate_ym <- sample(yearmonth_props_dt$yearmon, N, replace = TRUE, prob = yearmonth_props_dt$prob)
 
     ym_count_dt <- data.table(startdate_ym = startdate_ym) %>%
         group_by(startdate_ym) %>%
@@ -235,7 +234,8 @@ generate_random_startdates <- function(N
 
 
 generate_random_month_dates <- function(ym_datestr, N, dow_prob_dt) {
-cat(paste0("Generating start dates for ", ym_datestr, "\n"))
+
+    cat(paste0("Generating start dates for ", ym_datestr, "\n"))
     start_datestr <- paste0(ym_datestr, "-01")
 
     month_count <- Hmisc::monthDays(start_datestr)
