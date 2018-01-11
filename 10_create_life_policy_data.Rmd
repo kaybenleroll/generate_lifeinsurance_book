@@ -1,20 +1,24 @@
 ---
 title: "Life Policy Generation: 10 - Create Life Policy Data"
 author: "Mick Cooney"
-date: "1 October 2016"
+date: "11 January 2018"
 output:
   html_document:
     toc: true
     number_sections: true
     fig_caption: yes
     theme: cerulean
-    css: assets/styles.css
   pdf_document: default
 ---
 
 
 ```{r knit_opts, include = FALSE}
-knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
+knitr::opts_chunk$set(tidy  = FALSE
+                     ,cache = FALSE
+                     ,message = FALSE
+                     ,warning = FALSE
+                     ,fig.height =  8
+                     ,fig.width  = 11)
 
 library(tidyverse)
 library(data.table)
@@ -25,11 +29,13 @@ library(feather)
 
 library(lifecontingencies)
 
-options(width = 80)
+options(width = 80L
+       ,warn  = 1
+        )
+
+set.seed(421)
 
 source("custom_functions.R")
-
-set.seed(42)
 ```
 
 # Load Input Data

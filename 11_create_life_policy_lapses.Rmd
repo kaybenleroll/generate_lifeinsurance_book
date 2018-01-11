@@ -1,38 +1,27 @@
 ---
 title: "Life Policy Generation: 11 - Create Life Policy Lapses"
 author: "Mick Cooney"
-date: "1 October 2016"
+date: "11 January 2018"
 output:
   html_document:
     toc: true
     number_sections: true
     fig_caption: yes
     theme: cerulean
-    css: assets/styles.css
   pdf_document: default
 ---
-
-<!--
-(Title:) Life Policy Generation: 11 - Create Life Policy Lapses
-
-Author: Mick Cooney
-
-Date: 2016
-
-Abstract: This worksheet adds lapse information to the book of life policies.
-
-Keywords: life insurance, insurance, data generation
-
--->
-
-
-
 
 This worksheet enables the generation of a fake book of policies for a life insurance company in Ireland
 
 
 ```{r knit_opts, echo=FALSE}
-knitr::opts_chunk$set(tidy = FALSE, cache = FALSE)
+knitr::opts_chunk$set(tidy  = FALSE
+                     ,cache = FALSE
+                     ,message = FALSE
+                     ,warning = FALSE
+                     ,fig.height =  8
+                     ,fig.width  = 11)
+
 
 library(tidyverse)
 library(data.table)
@@ -42,9 +31,13 @@ library(feather)
 
 library(lubridate)
 
-source("custom_functions.R")
+options(width = 80L
+       ,warn  = 1
+        )
 
-set.seed(4211)
+set.seed(422)
+
+source("custom_functions.R")
 ```
 
 ## Load Input Data
